@@ -9,17 +9,16 @@ error FundMe__NotOwner();
 contract FundMe {
     using PriceConverter for uint256;
 
-    mapping(address funder => uint256 amountFounder)
-        public addressToAmountFunded;
-    address[] public funders;
+    mapping(address=> uint256) private s_addressToAmountFunded;
+    address[] public s_funders;
 
     uint256 public constant minimum_Usd = 5e18;
-    address public immutable owner;
+    address public immutable i_owner;
     AggregatorV3Interface private s_priceFeed;
 
     constructor(address priceFeed) {
         //输入参数 priceFeed 取决于要在那条链上
-        owner = msg.sender;
+        i_owner = msg.sender;
         s_priceFeed = AggregatorV3Interface(priceFeed);
     }
 
@@ -31,8 +30,8 @@ contract FundMe {
             msg.value.getConversionRate(s_priceFeed) >= minimum_Usd,
             "did't send enough ETH"
         );
-        funders.push(msg.sender);
-        addressToAmountFunded[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
+        s_addressToAmountFunded[msg.sender] += msg.value;
     }
 
     function withdraw() public {
@@ -42,15 +41,15 @@ contract FundMe {
         // for (/*starting index ,ending index , step amount */)
         for (
             uint256 funderIndex = 0;
-            funderIndex < funders.length;
+            funderIndex < s_funders.length;
             funderIndex++
         ) {
-            address funder = funders[funderIndex];
-            addressToAmountFunded[funder] = 0;
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
         }
         //reset the array
         //withdraw the funds
-        funders = new address[](0);
+        s_funders = new address[](0);
         //sending eth from a contract
         //transfer
         //send
@@ -74,7 +73,26 @@ contract FundMe {
 
     //Solidity function modifider
     modifier onlyOwner() {
-        if (msg.sender != owner) revert FundMe__NotOwner();
+        if (msg.sender != i_owner) revert FundMe__NotOwner();
         _;
+    }
+
+    fallback() external payable{
+        fund();
+    }
+
+    receive() external payable{
+        fund();
+    }
+
+ // 给外部提供了一个getter方法 从一个 mapping 数据结构中读取该地址对应的资助金额
+    function getAddressToAmountFunded(
+        address fundingAddress
+    )external view returns (uint256){  
+        return s_addressToAmountFunded[fundingAddress];
+    }
+
+    function getFunder(uint256 index) external view returns (address) {   
+       return s_funders[index] ;   
     }
 }

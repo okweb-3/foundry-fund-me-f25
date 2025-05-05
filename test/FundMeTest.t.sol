@@ -7,6 +7,11 @@ import {DeployFundMe} from "../script/DeployFundMe.s.sol";
 
 contract FundMeTest is Test {
     FundMe fundMe;
+    
+    uint256 constant SEND_VALUE = 0.1 ether; 
+    uint256 constant START_BALANCE = 100 ether;
+    //创建一个测试地址，让所有信息都从这个地址发送
+    address USER=makeAddr("user");
 
     function setUp() external {
         //先运行
@@ -14,6 +19,8 @@ contract FundMeTest is Test {
         // fundMe = new FundMe(0x694AA1769357215DE4FAC081bf1f309aDC325306);
         DeployFundMe deployFundMe = new DeployFundMe();
         fundMe = deployFundMe.run();
+        //给测试地址打点钱
+        vm.deal(USER, START_BALANCE); 
     }
 
     function testMinimunDollarIsFive() public {
@@ -22,7 +29,7 @@ contract FundMeTest is Test {
 
     function testOwnerIsMsgSender() public {
         //us->FunderMeTest->Fundme
-        assertEq(fundMe.owner(), msg.sender);
+        assertEq(fundMe.i_owner(), msg.sender);
     }
 
     function testPriceFeedVersionIsAccurate() public {
@@ -37,4 +44,15 @@ contract FundMeTest is Test {
     //integration
     //forked
     //staging
+    function testFundFailsWithOutEnoughETH() public {
+        vm.expectRevert(); //下一行代码即使是无法执行的，也能正常测试通过
+        fundMe.fund(); //发送了0ETH
+    }
+    function testFundUpdatesFundedDataStruct() public { 
+        vm.prank(USER);
+        fundMe.fund{value:SEND_VALUE}();
+        uint256 amountFunded = fundMe.getAddressToAmountFunded(USER);
+        assertEq (amountFunded,SEND_VALUE); 
+    }
+
 }
