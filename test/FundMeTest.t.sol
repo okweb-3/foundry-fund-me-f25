@@ -10,6 +10,7 @@ contract FundMeTest is Test {
 
     uint256 constant SEND_VALUE = 0.1 ether;
     uint256 constant START_BALANCE = 100 ether;
+    uint256 constant GAS_PRICE = 1;
     //创建一个测试地址，让所有信息都从这个地址发送
     address USER = makeAddr("user");
 
@@ -96,8 +97,6 @@ contract FundMeTest is Test {
         uint256 endingOwnerBalance = fundMe.getOwner().balance;
         uint256 endingFundMeBalance = address(fundMe).balance;
 
-        console.log("ending owner balance: ", endingOwnerBalance);
-        console.log("ending FundMe balance: ", endingFundMeBalance);
         assertEq(endingFundMeBalance, 0);
         assertEq(
             startingFundMeBalance + startingOwnerBalance,
@@ -119,15 +118,21 @@ contract FundMeTest is Test {
         uint256 startingOwnerBalance = fundMe.getOwner().balance;
         uint256 startingFundMeBalance = address(fundMe).balance;
 
-        console.log("starting owner balance: ", startingOwnerBalance);
-        console.log("starting FundME balances ", startingFundMeBalance);
         //Act
         // vm.prank(fundMe.getOwner());
         // funderMe.withdraw();
         //和下面的等价
+        // 执行前剩余 gas
+        uint256 gasStart = gasleft();
+        //设置交易为1wei
+        vm.txGasPrice(GAS_PRICE);
         vm.startPrank(fundMe.getOwner());
         fundMe.withdraw();
         vm.stopPrank();
+        // 执行后剩余 gas
+        uint256 gasEnd = gasleft();
+        uint256 gasUsed = (gasStart - gasEnd) * tx.gasprice; //当前交易的 gas price，单位是 wei，把 gas 消耗乘以价格，得到真实费用
+        console.log("gas used: ", gasUsed);
 
         //Assert
         assert(address(fundMe).balance == 0);
