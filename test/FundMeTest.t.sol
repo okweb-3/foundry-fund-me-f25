@@ -141,4 +141,42 @@ contract FundMeTest is Test {
                 fundMe.getOwner().balance
         );
     }
+    function testWithdrawFromMultipleFundersCheaper() public funded {
+        //Arrange
+        uint160 numberOfFunders = 10;
+        uint160 startingFunderIndex = 1;
+        for (uint i = startingFunderIndex; i < numberOfFunders; i++) {
+            //vm.prank 伪造一个新地址
+            //vm.deal
+            address funder = vm.addr(i); // 伪造的地址，用 i 做种子
+            hoax(funder, SEND_VALUE);
+            fundMe.fund{value: SEND_VALUE}();
+            //fund the fundMe
+        }
+        uint256 startingOwnerBalance = fundMe.getOwner().balance;
+        uint256 startingFundMeBalance = address(fundMe).balance;
+
+        //Act
+        // vm.prank(fundMe.getOwner());
+        // funderMe.withdraw();
+        //和下面的等价
+        // 执行前剩余 gas
+        uint256 gasStart = gasleft();
+        //设置交易为1wei
+        vm.txGasPrice(GAS_PRICE);
+        vm.startPrank(fundMe.getOwner());
+        fundMe.CheaperWithdraw();
+        vm.stopPrank();
+        // 执行后剩余 gas
+        uint256 gasEnd = gasleft();
+        uint256 gasUsed = (gasStart - gasEnd) * tx.gasprice; //当前交易的 gas price，单位是 wei，把 gas 消耗乘以价格，得到真实费用
+        console.log("gas used: ", gasUsed);
+
+        //Assert
+        assert(address(fundMe).balance == 0);
+        assert(
+            startingFundMeBalance + startingOwnerBalance ==
+                fundMe.getOwner().balance
+        );
+    }
 }

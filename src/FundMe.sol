@@ -9,7 +9,7 @@ error FundMe__NotOwner();
 contract FundMe {
     using PriceConverter for uint256;
 
-    mapping(address=> uint256) private s_addressToAmountFunded;
+    mapping(address => uint256) private s_addressToAmountFunded;
     address[] public s_funders;
 
     uint256 public constant minimum_Usd = 5e18;
@@ -33,7 +33,22 @@ contract FundMe {
         s_funders.push(msg.sender);
         s_addressToAmountFunded[msg.sender] += msg.value;
     }
-
+    function CheaperWithdraw() public onlyOwner {
+        uint256 fundersLength = s_funders.length;
+        for (
+            uint256 funderIndex = 0;
+            funderIndex < fundersLength;
+            funderIndex++
+        ) {
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
+        }
+        s_funders = new address[](0);
+        (bool callSuccess, ) = payable(msg.sender).call{
+            value: address(this).balance
+        }("");
+        require(callSuccess, "Call failed");
+    }
     function withdraw() public {
         //for loop
         //[1,2,3,4]
@@ -77,26 +92,26 @@ contract FundMe {
         _;
     }
 
-    fallback() external payable{
+    fallback() external payable {
         fund();
     }
 
-    receive() external payable{
+    receive() external payable {
         fund();
     }
 
- // 给外部提供了一个getter方法 从一个 mapping 数据结构中读取该地址对应的资助金额
+    // 给外部提供了一个getter方法 从一个 mapping 数据结构中读取该地址对应的资助金额
     function getAddressToAmountFunded(
         address fundingAddress
-    )external view returns (uint256){  
+    ) external view returns (uint256) {
         return s_addressToAmountFunded[fundingAddress];
     }
 
-    function getFunder(uint256 index) external view returns (address) {   
-       return s_funders[index] ;   
+    function getFunder(uint256 index) external view returns (address) {
+        return s_funders[index];
     }
 
-    function getOwner()external view returns(address){
-        return i_owner ;     
+    function getOwner() external view returns (address) {
+        return i_owner;
     }
 }
