@@ -7,11 +7,11 @@ import {DeployFundMe} from "../script/DeployFundMe.s.sol";
 
 contract FundMeTest is Test {
     FundMe fundMe;
-    
-    uint256 constant SEND_VALUE = 0.1 ether; 
+
+    uint256 constant SEND_VALUE = 0.1 ether;
     uint256 constant START_BALANCE = 100 ether;
     //创建一个测试地址，让所有信息都从这个地址发送
-    address USER=makeAddr("user");
+    address USER = makeAddr("user");
 
     function setUp() external {
         //先运行
@@ -20,7 +20,7 @@ contract FundMeTest is Test {
         DeployFundMe deployFundMe = new DeployFundMe();
         fundMe = deployFundMe.run();
         //给测试地址打点钱
-        vm.deal(USER, START_BALANCE); 
+        vm.deal(USER, START_BALANCE);
     }
 
     function testMinimunDollarIsFive() public {
@@ -29,7 +29,7 @@ contract FundMeTest is Test {
 
     function testOwnerIsMsgSender() public {
         //us->FunderMeTest->Fundme
-        assertEq(fundMe.i_owner(), msg.sender);
+        assertEq(fundMe.getOwner(), msg.sender);
     }
 
     function testPriceFeedVersionIsAccurate() public {
@@ -48,11 +48,92 @@ contract FundMeTest is Test {
         vm.expectRevert(); //下一行代码即使是无法执行的，也能正常测试通过
         fundMe.fund(); //发送了0ETH
     }
-    function testFundUpdatesFundedDataStruct() public { 
+
+    function testFundUpdatesFundedDataStruct() public {
         vm.prank(USER);
-        fundMe.fund{value:SEND_VALUE}();
+        fundMe.fund{value: SEND_VALUE}();
         uint256 amountFunded = fundMe.getAddressToAmountFunded(USER);
-        assertEq (amountFunded,SEND_VALUE); 
+        assertEq(amountFunded, SEND_VALUE);
     }
 
+    function testAddFunderToArrayOfFunders() public {
+        vm.prank(USER);
+        fundMe.fund{value: SEND_VALUE}();
+        address funder = fundMe.getFunder(0);
+        assertEq(funder, USER);
+    }
+
+    modifier funded() {
+        vm.prank(USER);
+        fundMe.fund{value: SEND_VALUE}();
+        _;
+    }
+
+    function testOnlyOwnerCanWithdraw() public funded {
+        vm.expectRevert(); //表示我们预期接下来的一行代码会抛出异常（即 revert）。如果没有 revert，则测试失败。
+        fundMe.withdraw();
+    }
+
+    /*
+        测试的三个阶段
+        1.Arrange 准备阶段 创建对象 变量和测试数据
+        2.Act 触发操作 调用函数并验证结果
+        3.Assert 断言阶段  验证结果是否符合预期
+    */
+    function testWithDrawWithASingleFunder() public funded {
+        //Arrange  检查取款之前的余额
+        uint256 startingOwnerBalance = fundMe.getOwner().balance;
+        uint256 startingFundMeBalance = address(fundMe).balance;
+
+        console.log("starting owner balance: ", startingOwnerBalance);
+        console.log("starting FundMe balance: ", startingFundMeBalance);
+
+        //Act
+        vm.prank(fundMe.getOwner());
+        fundMe.withdraw();
+
+        //Assert
+        uint256 endingOwnerBalance = fundMe.getOwner().balance;
+        uint256 endingFundMeBalance = address(fundMe).balance;
+
+        console.log("ending owner balance: ", endingOwnerBalance);
+        console.log("ending FundMe balance: ", endingFundMeBalance);
+        assertEq(endingFundMeBalance, 0);
+        assertEq(
+            startingFundMeBalance + startingOwnerBalance,
+            endingOwnerBalance
+        );
+    }
+    function testWithdrawFromMultipleFunders() public funded {
+        //Arrange
+        uint160 numberOfFunders = 10;
+        uint160 startingFunderIndex = 1;
+        for (uint i = startingFunderIndex; i < numberOfFunders; i++) {
+            //vm.prank 伪造一个新地址
+            //vm.deal
+            address funder = vm.addr(i); // 伪造的地址，用 i 做种子
+            hoax(funder, SEND_VALUE);
+            fundMe.fund{value: SEND_VALUE}();
+            //fund the fundMe
+        }
+        uint256 startingOwnerBalance = fundMe.getOwner().balance;
+        uint256 startingFundMeBalance = address(fundMe).balance;
+
+        console.log("starting owner balance: ", startingOwnerBalance);
+        console.log("starting FundME balances ", startingFundMeBalance);
+        //Act
+        // vm.prank(fundMe.getOwner());
+        // funderMe.withdraw();
+        //和下面的等价
+        vm.startPrank(fundMe.getOwner());
+        fundMe.withdraw();
+        vm.stopPrank();
+
+        //Assert
+        assert(address(fundMe).balance == 0);
+        assert(
+            startingFundMeBalance + startingOwnerBalance ==
+                fundMe.getOwner().balance
+        );
+    }
 }
